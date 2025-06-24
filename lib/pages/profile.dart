@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:utsmobile/pages/edit_profile.dart';
 import 'package:utsmobile/pages/favorites.dart';
 
@@ -11,8 +12,10 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _name = 'sugeng';
-  String _email = 'profile@gmail.com';
+  String _name = 'Loading...';
+  String _email = 'Loading...';
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
@@ -21,12 +24,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _name = prefs.getString('name') ?? 'sugeng';
-      _email = prefs.getString('email') ?? 'profile@gmail.com';
-    });
-    print('User data loaded: name=$_name, email=$_email');
+    final User? user = _auth.currentUser;
+    if (user == null) {
+      setState(() {
+        _name = 'Not Logged In';
+        _email = 'Please log in';
+      });
+      return;
+    }
+
+    try {
+      final DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+      setState(() {
+        _name = userDoc.exists ? (userDoc.get('name') ?? user.displayName ?? 'User') : (user.displayName ?? 'User');
+        _email = userDoc.exists ? (userDoc.get('email') ?? user.email ?? 'no-email') : (user.email ?? 'no-email');
+      });
+    } catch (e) {
+      setState(() {
+        _name = 'Error Loading';
+        _email = 'Please try again';
+      });
+      print('Error loading user data: $e');
+    }
   }
 
   @override
@@ -110,7 +129,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: const Text('Favorites'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
-                print('Navigating to /favorites');
                 Navigator.pushNamed(context, '/favorites');
               },
             ),
@@ -124,9 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: const Text('Logout'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.clear();
-                print('Logged out, SharedPreferences cleared');
+                await _auth.signOut();
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   '/login',

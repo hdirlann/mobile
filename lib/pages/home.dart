@@ -6,6 +6,7 @@ import 'package:utsmobile/models/popular_model.dart';
 import 'package:utsmobile/pages/menu.dart';
 import 'package:utsmobile/pages/profile.dart';
 import 'package:utsmobile/pages/article.dart';
+import 'package:utsmobile/pages/kategori.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -18,15 +19,30 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  late List<CategoryModel> categories;
-  late List<DietModel> diets;
-  late List<PopularDietsModel> popularDiets;
+  List<CategoryModel>? categories;
+  List<DietModel>? diets;
+  List<PopularDietsModel>? popularDiets;
   List<String> favoriteNames = [];
+  int _selectedCategoryIndex = -1;
+  bool _isLoading = true;
 
-  void _getInitialInfo() {
-    categories = CategoryModel.getCategories();
-    diets = DietModel.getDiets();
-    popularDiets = PopularDietsModel.getPopularDiets();
+  Future<void> _loadInitialInfo() async {
+    try {
+      final loadedCategories = CategoryModel.getCategories();
+      final loadedDiets = await DietModel.getDiets();
+      final loadedPopularDiets = PopularDietsModel.getPopularDiets();
+      setState(() {
+        categories = loadedCategories;
+        diets = loadedDiets;
+        popularDiets = loadedPopularDiets;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading initial info: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadFavorites() async {
@@ -43,28 +59,16 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _getInitialInfo();
+    _loadInitialInfo();
     _loadFavorites();
-    _pages = [
-      HomeContent(
-        categories: categories,
-        diets: diets,
-        popularDiets: popularDiets,
-        favoriteNames: favoriteNames,
-        onFavoriteToggled: (diet, isFavorite) {
-          _toggleFavorite(diet, isFavorite);
-        },
-      ),
-      const MenuScreen(),
-      const ArticleScreen(),
-      const ProfileScreen(),
-    ];
   }
 
   Future<void> _toggleFavorite(PopularDietsModel diet, bool isFavorite) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> favoriteNamesList = prefs.getString('favorite_diets') != null
-        ? (jsonDecode(prefs.getString('favorite_diets')!) as List<dynamic>).map((item) => item as String).toList()
+        ? (jsonDecode(prefs.getString('favorite_diets')!) as List<dynamic>)
+        .map((item) => item as String)
+        .toList()
         : [];
 
     if (isFavorite) {
@@ -84,33 +88,80 @@ class _HomePageState extends State<HomePage> {
       SnackBar(
         content: Text(
           isFavorite
-              ? '${diet.name} added to favorites'
-              : '${diet.name} removed from favorites',
+              ? '${diet.name} ditambahkan ke favorit'
+              : '${diet.name} dihapus dari favorit',
         ),
       ),
     );
-    print('Favorite diets updated: $favoriteNamesList');
+    print('Daftar diet favorit diperbarui: $favoriteNamesList');
   }
 
-  late final List<Widget> _pages;
-
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MenuScreen()),
+      ).then((_) {
+        _loadInitialInfo(); // Muat ulang data setelah kembali dari MenuScreen
+      });
+    } else {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading || categories == null || diets == null || popularDiets == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final pages = [
+      HomeContent(
+        categories: categories!,
+        diets: diets!,
+        popularDiets: popularDiets!,
+        favoriteNames: favoriteNames,
+        onFavoriteToggled: _toggleFavorite,
+        selectedCategoryIndex: _selectedCategoryIndex,
+        onCategoryTapped: (index) {
+          setState(() {
+            _selectedCategoryIndex = index;
+          });
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => KategoriScreen(
+                category: categories![index],
+                diets: diets!
+                    .where((diet) => diet.category == categories![index].name)
+                    .toList(),
+              ),
+            ),
+          ).then((_) {
+            setState(() {
+              _selectedCategoryIndex = -1;
+            });
+          });
+        },
+      ),
+      const MenuScreen(),
+      const ArticleScreen(),
+      const ProfileScreen(),
+    ];
+
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) {
-          print("Pop invoked, but blocked");
+          print("Pop dipanggil, tetapi diblokir");
         }
       },
       child: Scaffold(
-        body: _pages[_selectedIndex],
+        body: pages[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
           items: [
             BottomNavigationBarItem(
@@ -125,7 +176,7 @@ class _HomePageState extends State<HomePage> {
                   size: 24,
                 ),
               ),
-              label: 'Home',
+              label: 'Beranda',
             ),
             BottomNavigationBarItem(
               icon: SvgPicture.asset(
@@ -153,7 +204,7 @@ class _HomePageState extends State<HomePage> {
                   size: 24,
                 ),
               ),
-              label: 'Article',
+              label: 'Artikel',
             ),
             BottomNavigationBarItem(
               icon: SvgPicture.asset(
@@ -167,7 +218,7 @@ class _HomePageState extends State<HomePage> {
                   size: 24,
                 ),
               ),
-              label: 'Profile',
+              label: 'Profil',
             ),
           ],
           currentIndex: _selectedIndex,
@@ -186,6 +237,8 @@ class HomeContent extends StatelessWidget {
   final List<PopularDietsModel> popularDiets;
   final List<String> favoriteNames;
   final Function(PopularDietsModel, bool) onFavoriteToggled;
+  final int selectedCategoryIndex;
+  final Function(int) onCategoryTapped;
 
   const HomeContent({
     super.key,
@@ -194,6 +247,8 @@ class HomeContent extends StatelessWidget {
     required this.popularDiets,
     required this.favoriteNames,
     required this.onFavoriteToggled,
+    required this.selectedCategoryIndex,
+    required this.onCategoryTapped,
   });
 
   @override
@@ -205,7 +260,7 @@ class HomeContent extends StatelessWidget {
         children: [
           _searchField(),
           const SizedBox(height: 40),
-          _categoriesSection(),
+          _categoriesSection(context),
           const SizedBox(height: 40),
           _dietSection(),
           const SizedBox(height: 40),
@@ -215,7 +270,7 @@ class HomeContent extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.only(left: 20),
                 child: Text(
-                  'Popular',
+                  'Populer',
                   style: TextStyle(
                     color: Colors.black,
                     fontSize: 18,
@@ -309,7 +364,7 @@ class HomeContent extends StatelessWidget {
   AppBar appBar(BuildContext context) {
     return AppBar(
       title: const Text(
-        'Breakfast',
+        'Sarapan',
         style: TextStyle(
           color: Colors.black,
           fontSize: 18,
@@ -320,7 +375,6 @@ class HomeContent extends StatelessWidget {
       elevation: 0.0,
       centerTitle: true,
       automaticallyImplyLeading: false,
-      leading: null,
       actions: [
         Container(
           margin: const EdgeInsets.all(10),
@@ -352,7 +406,7 @@ class HomeContent extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.only(left: 20),
           child: Text(
-            'Recommendation\nfor Diet',
+            'Rekomendasi\nuntuk Diet',
             style: TextStyle(
               color: Colors.black,
               fontSize: 18,
@@ -407,7 +461,7 @@ class HomeContent extends StatelessWidget {
                       width: 130,
                       child: Center(
                         child: Text(
-                          'View',
+                          'Lihat',
                           style: TextStyle(
                             color: diets[index].viewIsSelected
                                 ? Colors.white
@@ -445,14 +499,14 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Column _categoriesSection() {
+  Column _categoriesSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
           padding: EdgeInsets.only(left: 20),
           child: Text(
-            'Category',
+            'Kategori',
             style: TextStyle(
               color: Colors.black,
               fontSize: 18,
@@ -469,43 +523,61 @@ class HomeContent extends StatelessWidget {
             padding: const EdgeInsets.only(left: 20, right: 20),
             separatorBuilder: (context, index) => const SizedBox(width: 25),
             itemBuilder: (context, index) {
-              return Container(
-                width: 100,
-                decoration: BoxDecoration(
-                  color: categories[index].boxColor.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
+              final isSelected = selectedCategoryIndex == index;
+              return GestureDetector(
+                onTap: () => onCategoryTapped(index),
+                child: Container(
+                  width: 100,
+                  decoration: BoxDecoration(
+                    color: categories[index].boxColor.withOpacity(isSelected ? 0.5 : 0.3),
+                    borderRadius: BorderRadius.circular(16),
+                    border: isSelected
+                        ? Border.all(color: const Color(0xff92A3FD), width: 2)
+                        : null,
+                    boxShadow: isSelected
+                        ? [
+                      BoxShadow(
+                        color: const Color(0xff1D1617).withOpacity(0.07),
+                        offset: const Offset(0, 5),
+                        blurRadius: 10,
+                        spreadRadius: 0,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: SvgPicture.asset(
-                          categories[index].iconPath,
-                          placeholderBuilder: (context) => const Icon(
-                            Icons.error,
-                            color: Colors.red,
-                            size: 24,
+                    ]
+                        : [],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: SvgPicture.asset(
+                            categories[index].iconPath,
+                            color: isSelected ? const Color(0xff92A3FD) : null,
+                            placeholderBuilder: (context) => const Icon(
+                              Icons.error,
+                              color: Colors.red,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Text(
-                      categories[index].name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w400,
-                        color: Colors.black,
-                        fontSize: 14,
+                      Text(
+                        categories[index].name,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected ? const Color(0xff92A3FD) : Colors.black,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -532,7 +604,7 @@ class HomeContent extends StatelessWidget {
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.all(15),
-          hintText: 'Search Pancake',
+          hintText: 'Cari Pancake',
           hintStyle: const TextStyle(
             color: Color(0xffDDDADA),
             fontSize: 14,

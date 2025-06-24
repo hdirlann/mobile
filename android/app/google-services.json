@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "343641735550",
+    "project_id": "utsmobile-983bd",
+    "storage_bucket": "utsmobile-983bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:343641735550:android:7aef12b9b71e712e04f32f",
+        "android_client_info": {
+          "package_name": "com.example.utsmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxlc0l7UIUvQfFls9qPxKodTBEeyFRjTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

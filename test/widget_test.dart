@@ -1,30 +1,41 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:utsmobile/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Menampilkan halaman login jika belum login', (WidgetTester tester) async {
+    // Bangun widget dengan status belum login
+    await tester.pumpWidget(const MyApp(isLoggedIn: false));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Pastikan teks 'Welcome Back!' tampil
+    expect(find.text('Welcome Back!'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Cek tombol login ada
+    expect(find.text('Login'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Cek field Email dan Password muncul
+    expect(find.widgetWithText(TextField, 'Email'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
+  });
+
+  testWidgets('Tombol login membawa ke halaman home', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp(isLoggedIn: false));
+    await tester.pumpAndSettle();
+
+    // Tekan tombol login
+    await tester.tap(find.text('Login'));
+    await tester.pumpAndSettle();
+
+    // Ganti ini sesuai widget atau teks yang muncul di HomePage
+    expect(find.text('Home'), findsOneWidget); // Sesuaikan jika perlu
+  });
+
+  testWidgets('Menampilkan halaman home jika sudah login', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp(isLoggedIn: true));
+    await tester.pumpAndSettle();
+
+    // Ganti dengan sesuatu yang khas dari halaman home
+    expect(find.text('Home'), findsOneWidget); // Sesuaikan jika perlu
   });
 }

@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Izin internet untuk mengakses TheMealDB API -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Izin untuk mengakses galeri/storage untuk image_picker -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <!-- Izin untuk Android 13+ untuk mengakses gambar -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
 
     <application
         android:label="utsmobile"
